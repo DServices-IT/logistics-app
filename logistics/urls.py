@@ -16,6 +16,7 @@ urlpatterns = [
     path("recurring/new/", views.recurring_create, name="recurring_new"),
     path("course/", views.course, name="course"),
     path("course/add/<int:task_id>/", views.course_add, name="course_add"),
+    path("course/add-all/", views.course_add_all, name="course_add_all"),
     path("course/remove/<int:task_id>/", views.course_remove, name="course_remove"),
     path("course/bulk-done/", views.course_bulk_done, name="course_bulk_done"),
     path("reports/", views.reports, name="reports"),

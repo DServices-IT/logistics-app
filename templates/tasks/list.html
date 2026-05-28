@@ -18,6 +18,13 @@
       {% endif %}
     </div>
     <div class="d-flex flex-wrap gap-2">
+      {% if is_courier %}
+        <form method="post" action="{% url 'tasks:course_add_all' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+          <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-check2-all me-1"></i>Вземи всички задачи</button>
+        </form>
+      {% endif %}
       {% if can_add_task %}
         <a class="btn btn-primary btn-sm" href="{% url 'tasks:new' %}"><i class="bi bi-plus-lg me-1"></i>Нова задача</a>
       {% endif %}

@@ -33,6 +33,10 @@ def _can_manage_recurring(user) -> bool:
     return authz.is_admin(user) or authz.is_merchant(user)
 
 
+def _available_course_tasks():
+    return Task.objects.filter(status=Task.Status.OPEN, course_items__isnull=True)
+
+
 @login_required
 def task_list(request: HttpRequest) -> HttpResponse:
     created_recurring = generate_recurring_tasks_for_day()
@@ -189,9 +193,38 @@ def course_add(request: HttpRequest, task_id: int) -> HttpResponse:
         raise PermissionDenied
     if not authz.is_courier(request.user):
         raise PermissionDenied
-    task = get_object_or_404(Task, pk=task_id)
-    CourierCourseItem.objects.get_or_create(courier=request.user, task=task)
-    messages.success(request, "Добавено в курса.")
+    task = get_object_or_404(_available_course_tasks(), pk=task_id)
+    _, created = CourierCourseItem.objects.get_or_create(courier=request.user, task=task)
+    if created:
+        messages.success(request, "Добавено в курса.")
+    else:
+        messages.info(request, "Задачата вече е в курса.")
+    return redirect(request.POST.get("next") or "tasks:list")
+
+
+@login_required
+def course_add_all(request: HttpRequest) -> HttpResponse:
+    if request.method != "POST":
+        raise PermissionDenied
+    if not authz.is_courier(request.user):
+        raise PermissionDenied
+
+    with transaction.atomic():
+        task_ids = list(
+            _available_course_tasks()
+            .select_for_update()
+            .order_by("-urgency", "due_at", "-created_at")
+            .values_list("id", flat=True)
+        )
+        CourierCourseItem.objects.bulk_create(
+            [CourierCourseItem(courier=request.user, task_id=task_id) for task_id in task_ids],
+            ignore_conflicts=True,
+        )
+
+    if task_ids:
+        messages.success(request, f"Взети задачи в курса: {len(task_ids)}.")
+        return redirect("tasks:course")
+    messages.info(request, "Няма свободни активни задачи за вземане.")
     return redirect(request.POST.get("next") or "tasks:list")
 
 
