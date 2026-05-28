@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Постоянни задачи{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-0">Постоянни задачи</h1>
+      <div class="text-muted small">Шаблоните създават задача само ако няма неприключена задача от същия шаблон.</div>
+    </div>
+    <a class="btn btn-primary btn-sm" href="{% url 'tasks:recurring_new' %}">Нова постоянна задача</a>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Задача</th>
+            <th>Повторение</th>
+            <th>Час</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in templates %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ t }}</div>
+                <div class="small text-muted">{{ t.contact_address|linebreaksbr }}</div>
+              </td>
+              <td>
+                {{ t.get_frequency_display }}
+                {% if t.frequency == 'weekly' %} · {{ t.get_weekday_display }}{% endif %}
+              </td>
+              <td>{{ t.due_time|time:'H:i' }}</td>
+              <td>
+                {% if t.is_active %}
+                  <span class="badge text-bg-success">Активна</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">Спряна</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-muted p-3">Няма постоянни задачи.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+

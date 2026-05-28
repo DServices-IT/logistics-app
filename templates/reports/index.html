@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Справки{% endblock %}
+
+{% block extra_head %}
+  <style>
+    .chart-box {
+      height: 190px;
+      position: relative;
+    }
+    .chart-box canvas {
+      display: block;
+      max-height: 190px;
+    }
+    @media (max-width: 768px) {
+      .chart-box {
+        height: 170px;
+      }
+      .chart-box canvas {
+        max-height: 170px;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
+    <div>
+      <h1 class="h4 mb-0">Справки</h1>
+      <div class="text-muted small">Дневна логистика: пропуснатите задачи се натрупват към избрания ден.</div>
+    </div>
+    <form class="d-flex align-items-end gap-2" method="get">
+      <div>
+        <label class="form-label mb-1" for="report-date">Дата</label>
+        <input class="form-control form-control-sm" id="report-date" type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
+      </div>
+      <button class="btn btn-outline-primary btn-sm" type="submit">Покажи</button>
+    </form>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body py-3"><div class="text-muted small">Планирани за деня</div><div class="h4 mb-0">{{ kpi.planned_day }}</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body py-3"><div class="text-muted small">Активни за деня</div><div class="h4 mb-0">{{ kpi.open_day }}</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body py-3"><div class="text-muted small">Пропуснати</div><div class="h4 mb-0 text-danger">{{ kpi.missed_before_day }}</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body py-3"><div class="text-muted small">За обработка</div><div class="h4 mb-0 text-primary">{{ kpi.workload_day }}</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body py-3"><div class="text-muted small">Приключени днес</div><div class="h4 mb-0 text-success">{{ kpi.done_day }}</div></div></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="card h-100"><div class="card-body py-3"><div class="text-muted small">Спешни активни</div><div class="h4 mb-0 text-danger">{{ kpi.urgent_open }}</div></div></div></div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="card"><div class="card-body py-3"><div class="text-muted small">Създадени (30 дни)</div><div class="h4 mb-0">{{ kpi.created_30d }}</div></div></div></div>
+    <div class="col-6 col-md-3"><div class="card"><div class="card-body py-3"><div class="text-muted small">Приключени (30 дни)</div><div class="h4 mb-0">{{ kpi.done_30d }}</div></div></div></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-md-7">
+      <div class="card">
+        <div class="card-body">
+          <h2 class="h6 mb-3">Планирани задачи по срок (30 дни)</h2>
+          <div class="chart-box">
+            <canvas id="chartTasksByDay"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-5">
+      <div class="card">
+        <div class="card-body">
+          <h2 class="h6 mb-3">Активни за обработка по спешност</h2>
+          <div class="chart-box">
+            <canvas id="chartUrgency"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  {{ chart_days|json_script:"chart-days" }}
+  {{ chart_counts|json_script:"chart-counts" }}
+  {{ chart_urgency_labels|json_script:"chart-urgency-labels" }}
+  {{ chart_urgency_counts|json_script:"chart-urgency-counts" }}
+  <script>
+    const days = JSON.parse(document.getElementById('chart-days').textContent);
+    const counts = JSON.parse(document.getElementById('chart-counts').textContent);
+    const urgencyLabels = JSON.parse(document.getElementById('chart-urgency-labels').textContent);
+    const urgencyCounts = JSON.parse(document.getElementById('chart-urgency-counts').textContent);
+
+    new Chart(document.getElementById('chartTasksByDay'), {
+      type: 'line',
+      data: { labels: days, datasets: [{ label: 'Планирани', data: counts, tension: 0.3 }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    new Chart(document.getElementById('chartUrgency'), {
+      type: 'bar',
+      data: { labels: urgencyLabels, datasets: [{ label: 'Активни', data: urgencyCounts }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  </script>
+{% endblock %}
+

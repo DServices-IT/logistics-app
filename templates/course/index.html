@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Моят курс{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-0">Моят курс</h1>
+      <div class="text-muted small">Всеки ден започва нов курс. Отбележете само неготовите; останалите се приключват с един бутон.</div>
+    </div>
+    <a class="btn btn-outline-dark btn-sm" href="{% url 'tasks:list' %}">Обратно</a>
+  </div>
+
+  <form method="post" action="{% url 'tasks:course_bulk_done' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{% url 'tasks:course' %}" />
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width: 120px;">Неготова</th>
+                <th>ID</th>
+                <th>Задача</th>
+                <th>Срок</th>
+                <th>Спешност</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+                {% with t=item.task %}
+                  <tr class="{% if t.is_overdue %}table-danger{% endif %}">
+                    <td>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="task_ids" value="{{ t.id }}" id="not-ready-{{ t.id }}" />
+                        <label class="form-check-label small" for="not-ready-{{ t.id }}">Не е готова</label>
+                      </div>
+                    </td>
+                    <td class="text-muted">{{ t.id }}</td>
+                    <td>
+                      <a class="fw-semibold text-decoration-none" href="{% url 'tasks:detail' t.id %}">{{ t.title }}</a>
+                      <div class="small text-muted">{{ t.get_type_display }} · добавена: {{ t.created_at|date:'d.m.Y H:i' }}</div>
+                    </td>
+                    <td class="small">
+                      <span class="{% if t.is_overdue %}text-danger fw-semibold{% endif %}">{{ t.due_at|date:'d.m.Y H:i' }}</span>
+                      {% if t.is_overdue %}<div class="small text-danger">просрочена</div>{% endif %}
+                    </td>
+                    <td>
+                      {% if t.urgency == Task.Urgency.URGENT %}
+                        <span class="badge badge-soft text-bg-danger">Спешна</span>
+                      {% elif t.urgency == Task.Urgency.HIGH %}
+                        <span class="badge badge-soft text-bg-warning">Висока</span>
+                      {% elif t.urgency == Task.Urgency.NORMAL %}
+                        <span class="badge badge-soft text-bg-info">Нормална</span>
+                      {% else %}
+                        <span class="badge badge-soft text-bg-secondary">Ниска</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <button class="btn btn-link btn-sm" type="submit" formaction="{% url 'tasks:course_remove' t.id %}">Премахни</button>
+                    </td>
+                  </tr>
+                {% endwith %}
+              {% empty %}
+                <tr><td colspan="6" class="text-muted p-3">Няма задачи в курса.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
+        <div class="text-muted small">
+          “Приключи всички без неготовите” приключва неотбелязаните, а отбелязаните планира за следващия ден.
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-success btn-sm" type="submit" name="mode" value="finish_except_not_ready">
+            Приключи всички без неготовите
+          </button>
+          <button class="btn btn-outline-success btn-sm" type="submit" name="mode" value="finish_all">
+            Приключи всички
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+{% endblock %}
+
