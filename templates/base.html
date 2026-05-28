@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Вътрешна логистика{% endblock %}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+    {# Material Design-ish Bootstrap theme layer (CDN). Can be replaced with self-hosted later. #}
+    <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/materia/bootstrap.min.css" rel="stylesheet" />
+
+    <style>
+      :root { --bs-body-font-family: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif; }
+      .navbar .logout-button {
+        color: rgba(255, 255, 255, .9);
+        text-decoration: none;
+      }
+      .navbar .logout-button:hover,
+      .navbar .logout-button:focus {
+        color: #fff;
+      }
+      .task-actions {
+        min-width: 10rem;
+      }
+      .table td,
+      .table th {
+        vertical-align: middle;
+      }
+      .badge-soft {
+        font-weight: 500;
+        letter-spacing: .01em;
+      }
+    </style>
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container">
+        <a class="navbar-brand fw-semibold" href="{% url 'tasks:list' %}">Вътрешна логистика</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Отвори меню">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarMain">
+          <ul class="navbar-nav me-auto">
+            {% if user.is_authenticated %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'tasks:list' %}">Задачи</a></li>
+              {% if is_courier %}
+                <li class="nav-item"><a class="nav-link" href="{% url 'tasks:course' %}">Моят курс</a></li>
+              {% endif %}
+              {% if is_merchant or is_admin %}
+                <li class="nav-item"><a class="nav-link" href="{% url 'tasks:reports' %}">Справки</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tasks:recurring_list' %}">Постоянни задачи</a></li>
+              {% endif %}
+            {% endif %}
+          </ul>
+          <ul class="navbar-nav ms-auto">
+            {% if user.is_authenticated %}
+              <li class="nav-item"><span class="navbar-text me-2">{{ user.get_username }}</span></li>
+              <li class="nav-item">
+                <form method="post" action="{% url 'tasks:logout' %}">
+                  {% csrf_token %}
+                  <button class="nav-link btn btn-link border-0 px-0 px-lg-2 logout-button" type="submit">
+                    <i class="bi bi-box-arrow-right me-1"></i>Изход
+                  </button>
+                </form>
+              </li>
+            {% else %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'tasks:login' %}">Вход</a></li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4">
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} mb-3" role="alert">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>
+

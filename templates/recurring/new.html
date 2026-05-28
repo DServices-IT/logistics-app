@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Нова постоянна задача{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h4 mb-0">Нова постоянна задача</h1>
+      <div class="text-muted small">За ежедневни/седмични повтарящи се задачи.</div>
+    </div>
+    <a class="btn btn-outline-dark btn-sm" href="{% url 'tasks:recurring_list' %}">Назад</a>
+  </div>
+
+  <form class="card card-body" method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.task_text.id_for_label }}">Задача</label>
+        {{ form.task_text }}
+        {{ form.task_text.errors }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.contact_address.id_for_label }}">Контакти и адрес</label>
+        {{ form.contact_address }}
+        {{ form.contact_address.errors }}
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label" for="{{ form.frequency.id_for_label }}">Повторение</label>
+        {{ form.frequency }}
+        {{ form.frequency.errors }}
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label" for="{{ form.weekday.id_for_label }}">Ден от седмицата</label>
+        {{ form.weekday }}
+        <div class="form-text">Само за седмични задачи.</div>
+        {{ form.weekday.errors }}
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label" for="{{ form.due_time.id_for_label }}">Час</label>
+        {{ form.due_time }}
+        {{ form.due_time.errors }}
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label" for="{{ form.type.id_for_label }}">Вид</label>
+        {{ form.type }}
+        {{ form.type.errors }}
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label" for="{{ form.urgency.id_for_label }}">Спешност</label>
+        {{ form.urgency }}
+        {{ form.urgency.errors }}
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="{{ form.note.id_for_label }}">Забележка</label>
+        {{ form.note }}
+        {{ form.note.errors }}
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          {{ form.is_active }}
+          <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Активна</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-3 d-flex gap-2">
+      <button class="btn btn-primary" type="submit">Запази</button>
+      <a class="btn btn-outline-dark" href="{% url 'tasks:recurring_list' %}">Отказ</a>
+    </div>
+  </form>
+{% endblock %}
+

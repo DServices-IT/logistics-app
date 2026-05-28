@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Задача #{{ task.id }}{% endblock %}
+
+{% block content %}
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h1 class="h4 mb-1">#{{ task.id }} · {{ task.title }}</h1>
+      <div class="text-muted small">{{ task.get_type_display }} · {{ task.get_status_display }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-dark btn-sm" href="{% url 'tasks:list' %}">Назад</a>
+      {% if is_admin %}
+        <a class="btn btn-outline-primary btn-sm" href="/admin/logistics/task/{{ task.id }}/change/">Редакция в администрация</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-7">
+      <div class="card">
+        <div class="card-body">
+          <div class="mb-2"><span class="text-muted">Адрес:</span><div class="fw-semibold">{{ task.address.name|default_if_none:'' }}</div><div>{{ task.address_text|linebreaksbr }}</div></div>
+          {% if task.location_note %}<div class="mb-2"><span class="text-muted">Бележка:</span> {{ task.location_note }}</div>{% endif %}
+          {% if task.description %}<div class="mb-2"><span class="text-muted">Описание:</span><div>{{ task.description|linebreaksbr }}</div></div>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-5">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between"><span class="text-muted">Създадена</span><span>{{ task.created_at|date:'d.m.Y H:i' }}</span></div>
+          <div class="d-flex justify-content-between"><span class="text-muted">Срок</span><span class="{% if task.is_overdue %}text-danger fw-semibold{% endif %}">{{ task.due_at|date:'d.m.Y H:i' }}</span></div>
+          <div class="d-flex justify-content-between"><span class="text-muted">Спешност</span><span>{{ task.get_urgency_display }}</span></div>
+          <hr />
+          <div class="d-flex justify-content-between"><span class="text-muted">Създал</span><span>{{ task.created_by.get_username }}</span></div>
+          <div class="d-flex justify-content-between"><span class="text-muted">Приключена</span><span>{{ task.done_at|date:'d.m.Y H:i'|default:'—' }}</span></div>
+          <div class="d-flex justify-content-between"><span class="text-muted">Приключил</span><span>{{ task.done_by.get_username|default:'—' }}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

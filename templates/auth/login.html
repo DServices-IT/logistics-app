@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Вход{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-7 col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <h1 class="h4 mb-3">Вход</h1>
+          {% if form.errors %}
+            <div class="alert alert-danger" role="alert">
+              Грешно потребителско име или парола.
+            </div>
+          {% endif %}
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ form.username.id_for_label }}">Потребител</label>
+              <input class="form-control" id="{{ form.username.id_for_label }}" name="{{ form.username.html_name }}" value="{{ form.username.value|default:'' }}" autocomplete="username" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="{{ form.password.id_for_label }}">Парола</label>
+              <input type="password" class="form-control" id="{{ form.password.id_for_label }}" name="{{ form.password.html_name }}" autocomplete="current-password" required />
+            </div>
+            <button class="btn btn-primary w-100" type="submit">Вход</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
