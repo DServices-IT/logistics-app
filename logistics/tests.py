@@ -274,6 +274,27 @@ class TaskListOrderingTests(TestCase):
         first = page.object_list[0]
         self.assertEqual(first.id, self.overdue.id)
 
+    def test_title_sort_orders_alphabetically(self):
+        self.client.login(username="u1", password="pw")
+        resp = self.client.get(reverse("tasks:list"), data={"sort": "title"})
+
+        self.assertEqual(resp.status_code, 200)
+        titles = [task.title for task in resp.context["page"].object_list]
+        self.assertEqual(titles, sorted(titles))
+
+    def test_search_matches_title_and_address_text(self):
+        self.overdue.address_text = "София, ул. Търсена 12"
+        self.overdue.save(update_fields=["address_text"])
+
+        self.client.login(username="u1", password="pw")
+        title_resp = self.client.get(reverse("tasks:list"), data={"q": "Urgent future", "assignment": "all"})
+        address_resp = self.client.get(reverse("tasks:list"), data={"q": "Търсена"})
+
+        self.assertEqual(title_resp.status_code, 200)
+        self.assertEqual(address_resp.status_code, 200)
+        self.assertEqual([task.id for task in title_resp.context["page"].object_list], [self.urgent_future.id])
+        self.assertEqual([task.id for task in address_resp.context["page"].object_list], [self.overdue.id])
+
     def test_default_list_excludes_done_and_assigned_tasks(self):
         courier = User.objects.create_user(username="courier2", password="pw")
         done_task = Task.objects.create(

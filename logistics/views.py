@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Case, Count, IntegerField, Value, When
+from django.db.models import Case, Count, Exists, IntegerField, OuterRef, Q, Value, When
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -34,7 +34,41 @@ def _can_manage_recurring(user) -> bool:
 
 
 def _available_course_tasks():
-    return Task.objects.filter(status=Task.Status.OPEN, course_items__isnull=True)
+    assigned = CourierCourseItem.objects.filter(task_id=OuterRef("pk"))
+    return (
+        Task.objects.filter(status=Task.Status.OPEN)
+        .annotate(is_assigned=Exists(assigned))
+        .filter(is_assigned=False)
+    )
+
+
+SORT_OPTIONS = {
+    "priority": ("-urgency", "due_at", "-created_at"),
+    "id": ("id",),
+    "id_desc": ("-id",),
+    "title": ("title", "due_at"),
+    "title_desc": ("-title", "due_at"),
+    "address": ("address__name", "address_text", "due_at"),
+    "address_desc": ("-address__name", "-address_text", "due_at"),
+    "due": ("due_at", "-urgency", "-created_at"),
+    "due_desc": ("-due_at", "-urgency", "-created_at"),
+    "urgency": ("-urgency", "due_at", "-created_at"),
+    "urgency_asc": ("urgency", "due_at", "-created_at"),
+    "status": ("status", "due_at"),
+    "status_desc": ("-status", "due_at"),
+}
+
+
+def _sort_link(query_params, current_sort: str, asc_sort: str, desc_sort: str) -> dict[str, str | bool]:
+    next_sort = desc_sort if current_sort == asc_sort else asc_sort
+    params = query_params.copy()
+    params["sort"] = next_sort
+    params.pop("page", None)
+    return {
+        "url": f"?{params.urlencode()}",
+        "active": current_sort in {asc_sort, desc_sort},
+        "desc": current_sort == desc_sort,
+    }
 
 
 @login_required
@@ -71,6 +105,18 @@ def task_list(request: HttpRequest) -> HttpResponse:
     if urgency.isdigit():
         qs = qs.filter(urgency=int(urgency))
 
+    query = (request.GET.get("q") or "").strip()
+    if query:
+        qs = qs.filter(
+            Q(title__icontains=query)
+            | Q(description__icontains=query)
+            | Q(customer_name__icontains=query)
+            | Q(phone__icontains=query)
+            | Q(address_text__icontains=query)
+            | Q(location_note__icontains=query)
+            | Q(address__name__icontains=query)
+        )
+
     sort = request.GET.get("sort") or "priority"
     qs = qs.distinct().annotate(
         overdue_boost=Case(
@@ -79,15 +125,9 @@ def task_list(request: HttpRequest) -> HttpResponse:
             output_field=IntegerField(),
         )
     )
-    if sort == "due":
-        qs = qs.order_by("due_at", "-urgency", "-created_at")
-    elif sort == "due_desc":
-        qs = qs.order_by("-due_at", "-urgency", "-created_at")
-    elif sort == "urgency":
-        qs = qs.order_by("-urgency", "due_at", "-created_at")
-    else:
+    if sort not in SORT_OPTIONS:
         sort = "priority"
-        qs = qs.order_by("-urgency", "due_at", "-created_at")
+    qs = qs.order_by(*SORT_OPTIONS[sort])
 
     paginator = Paginator(qs, 25)
     page = paginator.get_page(request.GET.get("page"))
@@ -103,6 +143,18 @@ def task_list(request: HttpRequest) -> HttpResponse:
     today_open_count = Task.objects.filter(status=Task.Status.OPEN, due_at__date=today).count()
     future_count = Task.objects.filter(status=Task.Status.OPEN, due_at__date__gt=today).count()
 
+    query_params = request.GET.copy()
+    query_params.pop("page", None)
+    page_query = query_params.urlencode()
+    sort_links = {
+        "id": _sort_link(query_params, sort, "id", "id_desc"),
+        "title": _sort_link(query_params, sort, "title", "title_desc"),
+        "address": _sort_link(query_params, sort, "address", "address_desc"),
+        "due": _sort_link(query_params, sort, "due", "due_desc"),
+        "urgency": _sort_link(query_params, sort, "urgency_asc", "urgency"),
+        "status": _sort_link(query_params, sort, "status", "status_desc"),
+    }
+
     return render(
         request,
         "tasks/list.html",
@@ -110,7 +162,16 @@ def task_list(request: HttpRequest) -> HttpResponse:
             "page": page,
             "can_add_task": _can_add_task(request.user),
             "can_manage_recurring": _can_manage_recurring(request.user),
-            "filters": {"status": status, "assignment": assignment, "type": ttype, "urgency": urgency, "sort": sort},
+            "filters": {
+                "status": status,
+                "assignment": assignment,
+                "type": ttype,
+                "urgency": urgency,
+                "sort": sort,
+                "q": query,
+            },
+            "sort_links": sort_links,
+            "page_query": page_query,
             "Task": Task,
             "in_course_ids": in_course_ids,
             "course_count": len(in_course_ids),
