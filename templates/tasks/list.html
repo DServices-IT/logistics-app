@@ -18,6 +18,13 @@
       {% endif %}
     </div>
     <div class="d-flex flex-wrap gap-2">
+      {% if is_courier %}
+        <form method="post" action="{% url 'tasks:course_add_all' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+          <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-check2-all me-1"></i>Вземи всички задачи</button>
+        </form>
+      {% endif %}
       {% if can_add_task %}
         <a class="btn btn-primary btn-sm" href="{% url 'tasks:new' %}"><i class="bi bi-plus-lg me-1"></i>Нова задача</a>
       {% endif %}
@@ -32,6 +39,16 @@
 
   <form class="card card-body mb-3" method="get">
     <div class="row g-2">
+      <div class="col-12 col-xl-4">
+        <label class="form-label mb-1">Търсене</label>
+        <input
+          class="form-control form-control-sm"
+          type="search"
+          name="q"
+          value="{{ filters.q }}"
+          placeholder="Задача, адрес, клиент, телефон..."
+        />
+      </div>
       <div class="col-12 col-md-4 col-xl-2">
         <label class="form-label mb-1">Статус</label>
         <select class="form-select form-select-sm" name="status">
@@ -70,9 +87,18 @@
         <label class="form-label mb-1">Сортиране</label>
         <select class="form-select form-select-sm" name="sort">
           <option value="priority" {% if filters.sort == 'priority' %}selected{% endif %}>Спешност + срок</option>
+          <option value="id_desc" {% if filters.sort == 'id_desc' %}selected{% endif %}>ID: нови първо</option>
+          <option value="id" {% if filters.sort == 'id' %}selected{% endif %}>ID: стари първо</option>
+          <option value="title" {% if filters.sort == 'title' %}selected{% endif %}>Задача: A-Z</option>
+          <option value="title_desc" {% if filters.sort == 'title_desc' %}selected{% endif %}>Задача: Z-A</option>
+          <option value="address" {% if filters.sort == 'address' %}selected{% endif %}>Адрес: A-Z</option>
+          <option value="address_desc" {% if filters.sort == 'address_desc' %}selected{% endif %}>Адрес: Z-A</option>
           <option value="due" {% if filters.sort == 'due' %}selected{% endif %}>Срок: най-скоро</option>
           <option value="due_desc" {% if filters.sort == 'due_desc' %}selected{% endif %}>Срок: най-късно</option>
-          <option value="urgency" {% if filters.sort == 'urgency' %}selected{% endif %}>Само спешност</option>
+          <option value="urgency" {% if filters.sort == 'urgency' %}selected{% endif %}>Спешност: висока първо</option>
+          <option value="urgency_asc" {% if filters.sort == 'urgency_asc' %}selected{% endif %}>Спешност: ниска първо</option>
+          <option value="status" {% if filters.sort == 'status' %}selected{% endif %}>Статус: A-Z</option>
+          <option value="status_desc" {% if filters.sort == 'status_desc' %}selected{% endif %}>Статус: Z-A</option>
         </select>
       </div>
       <div class="col-12 col-md-4 col-xl-2 d-flex align-items-end gap-2">
@@ -86,12 +112,36 @@
     <table class="table table-sm align-middle">
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Задача</th>
-          <th>Адрес</th>
-          <th>Срок</th>
-          <th>Спешност</th>
-          <th>Статус</th>
+          <th>
+            <a class="link-dark text-decoration-none" href="{{ sort_links.id.url }}">
+              ID{% if sort_links.id.active %} <i class="bi {% if sort_links.id.desc %}bi-sort-down{% else %}bi-sort-up{% endif %}"></i>{% endif %}
+            </a>
+          </th>
+          <th>
+            <a class="link-dark text-decoration-none" href="{{ sort_links.title.url }}">
+              Задача{% if sort_links.title.active %} <i class="bi {% if sort_links.title.desc %}bi-sort-down{% else %}bi-sort-up{% endif %}"></i>{% endif %}
+            </a>
+          </th>
+          <th>
+            <a class="link-dark text-decoration-none" href="{{ sort_links.address.url }}">
+              Адрес{% if sort_links.address.active %} <i class="bi {% if sort_links.address.desc %}bi-sort-down{% else %}bi-sort-up{% endif %}"></i>{% endif %}
+            </a>
+          </th>
+          <th>
+            <a class="link-dark text-decoration-none" href="{{ sort_links.due.url }}">
+              Срок{% if sort_links.due.active %} <i class="bi {% if sort_links.due.desc %}bi-sort-down{% else %}bi-sort-up{% endif %}"></i>{% endif %}
+            </a>
+          </th>
+          <th>
+            <a class="link-dark text-decoration-none" href="{{ sort_links.urgency.url }}">
+              Спешност{% if sort_links.urgency.active %} <i class="bi {% if sort_links.urgency.desc %}bi-sort-down{% else %}bi-sort-up{% endif %}"></i>{% endif %}
+            </a>
+          </th>
+          <th>
+            <a class="link-dark text-decoration-none" href="{{ sort_links.status.url }}">
+              Статус{% if sort_links.status.active %} <i class="bi {% if sort_links.status.desc %}bi-sort-down{% else %}bi-sort-up{% endif %}"></i>{% endif %}
+            </a>
+          </th>
           {% if is_courier %}<th class="text-end">Действие</th>{% endif %}
         </tr>
       </thead>
@@ -155,13 +205,13 @@
     <nav aria-label="Pagination">
       <ul class="pagination pagination-sm">
         {% if page.has_previous %}
-          <li class="page-item"><a class="page-link" href="?page={{ page.previous_page_number }}">Назад</a></li>
+          <li class="page-item"><a class="page-link" href="{% if page_query %}?{{ page_query }}&page={{ page.previous_page_number }}{% else %}?page={{ page.previous_page_number }}{% endif %}">Назад</a></li>
         {% else %}
           <li class="page-item disabled"><span class="page-link">Назад</span></li>
         {% endif %}
         <li class="page-item disabled"><span class="page-link">Страница {{ page.number }} / {{ page.paginator.num_pages }}</span></li>
         {% if page.has_next %}
-          <li class="page-item"><a class="page-link" href="?page={{ page.next_page_number }}">Напред</a></li>
+          <li class="page-item"><a class="page-link" href="{% if page_query %}?{{ page_query }}&page={{ page.next_page_number }}{% else %}?page={{ page.next_page_number }}{% endif %}">Напред</a></li>
         {% else %}
           <li class="page-item disabled"><span class="page-link">Напред</span></li>
         {% endif %}

@@ -55,6 +55,62 @@ class TaskFormTests(TestCase):
         self.assertEqual(timezone.localtime(task.due_at).hour, END_OF_DAY_HOUR)
 
 
+class CourseBulkAddTests(TestCase):
+    def setUp(self):
+        self.courier_group, _ = Group.objects.get_or_create(name=authz.COURIER_GROUP)
+        self.courier = User.objects.create_user(username="courier", password="pw")
+        self.courier.groups.add(self.courier_group)
+        self.other_courier = User.objects.create_user(username="courier-other", password="pw")
+        self.other_courier.groups.add(self.courier_group)
+        self.creator = User.objects.create_user(username="merchant-bulk", password="pw")
+
+    def _task(self, title: str, **overrides) -> Task:
+        data = {
+            "type": Task.Type.DELIVERY,
+            "title": title,
+            "created_by": self.creator,
+            "due_at": timezone.now() + timedelta(days=1),
+            "urgency": Task.Urgency.NORMAL,
+        }
+        data.update(overrides)
+        return Task.objects.create(**data)
+
+    def test_bulk_add_button_is_visible_for_couriers(self):
+        self.client.login(username="courier", password="pw")
+
+        resp = self.client.get(reverse("tasks:list"))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Вземи всички задачи")
+        self.assertContains(resp, reverse("tasks:course_add_all"))
+
+    def test_bulk_add_takes_all_open_unassigned_tasks(self):
+        open_tasks = [self._task(f"Open {i}") for i in range(30)]
+        done_task = self._task("Done", status=Task.Status.DONE)
+        assigned_task = self._task("Already assigned")
+        CourierCourseItem.objects.create(courier=self.other_courier, task=assigned_task)
+
+        self.client.login(username="courier", password="pw")
+        resp = self.client.post(reverse("tasks:course_add_all"), follow=True)
+
+        self.assertEqual(resp.status_code, 200)
+        course_task_ids = set(
+            CourierCourseItem.objects.filter(courier=self.courier).values_list("task_id", flat=True)
+        )
+        self.assertEqual(course_task_ids, {task.id for task in open_tasks})
+        self.assertNotIn(done_task.id, course_task_ids)
+        self.assertNotIn(assigned_task.id, course_task_ids)
+
+    def test_bulk_add_requires_courier_role(self):
+        user = User.objects.create_user(username="not-courier", password="pw")
+        self.client.login(username="not-courier", password="pw")
+
+        resp = self.client.post(reverse("tasks:course_add_all"))
+
+        self.assertEqual(resp.status_code, 403)
+        self.assertFalse(CourierCourseItem.objects.filter(courier=user).exists())
+
+
 class CourseBulkDoneTests(TestCase):
     def setUp(self):
         self.courier_group, _ = Group.objects.get_or_create(name=authz.COURIER_GROUP)
@@ -217,6 +273,27 @@ class TaskListOrderingTests(TestCase):
         page = resp.context["page"]
         first = page.object_list[0]
         self.assertEqual(first.id, self.overdue.id)
+
+    def test_title_sort_orders_alphabetically(self):
+        self.client.login(username="u1", password="pw")
+        resp = self.client.get(reverse("tasks:list"), data={"sort": "title"})
+
+        self.assertEqual(resp.status_code, 200)
+        titles = [task.title for task in resp.context["page"].object_list]
+        self.assertEqual(titles, sorted(titles))
+
+    def test_search_matches_title_and_address_text(self):
+        self.overdue.address_text = "София, ул. Търсена 12"
+        self.overdue.save(update_fields=["address_text"])
+
+        self.client.login(username="u1", password="pw")
+        title_resp = self.client.get(reverse("tasks:list"), data={"q": "Urgent future", "assignment": "all"})
+        address_resp = self.client.get(reverse("tasks:list"), data={"q": "Търсена"})
+
+        self.assertEqual(title_resp.status_code, 200)
+        self.assertEqual(address_resp.status_code, 200)
+        self.assertEqual([task.id for task in title_resp.context["page"].object_list], [self.urgent_future.id])
+        self.assertEqual([task.id for task in address_resp.context["page"].object_list], [self.overdue.id])
 
     def test_default_list_excludes_done_and_assigned_tasks(self):
         courier = User.objects.create_user(username="courier2", password="pw")
