@@ -26,7 +26,7 @@ def home_redirect(request: HttpRequest) -> HttpResponse:
 
 
 def _can_add_task(user) -> bool:
-    return authz.is_admin(user) or authz.is_courier(user) or authz.is_merchant(user)
+    return authz.is_admin(user) or authz.is_merchant(user)
 
 
 def _can_manage_recurring(user) -> bool:
@@ -176,7 +176,7 @@ def course(request: HttpRequest) -> HttpResponse:
     if not authz.is_courier(request.user):
         raise PermissionDenied
     items = (
-        CourierCourseItem.objects.filter(courier=request.user)
+        CourierCourseItem.objects.all()
         .select_related("task", "task__address", "task__created_by")
         .order_by("-added_at")
     )
