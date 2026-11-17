@@ -12,9 +12,9 @@
         {{ daily_summary.missed_count }} пропуснати,
         {{ daily_summary.future_count }} планирани напред.
       </div>
-      <div class="text-muted small">По подразбиране се показват само активни задачи, които още не са взети от куриер.</div>
+      <div class="text-muted small">Показват се активните задачи; постоянните задачи се виждат в дневния курс.</div>
       {% if is_courier %}
-        <div class="text-muted small">В курса: {{ course_count }} задачи</div>
+        <div class="text-muted small">В курса за днес: {{ course_count }} задачи</div>
       {% endif %}
     </div>
     <div class="d-flex flex-wrap gap-2">
@@ -43,8 +43,8 @@
       <div class="col-12 col-md-4 col-xl-2">
         <label class="form-label mb-1">Разпределяне</label>
         <select class="form-select form-select-sm" name="assignment">
-          <option value="unassigned" {% if filters.assignment == 'unassigned' %}selected{% endif %}>Свободни</option>
-          <option value="assigned" {% if filters.assignment == 'assigned' %}selected{% endif %}>Взети</option>
+          <option value="unassigned" {% if filters.assignment == 'unassigned' %}selected{% endif %}>Извън курс</option>
+          <option value="assigned" {% if filters.assignment == 'assigned' %}selected{% endif %}>В курс</option>
           <option value="all" {% if filters.assignment == 'all' %}selected{% endif %}>Всички</option>
         </select>
       </div>
@@ -57,22 +57,11 @@
         </select>
       </div>
       <div class="col-12 col-md-4 col-xl-2">
-        <label class="form-label mb-1">Спешност</label>
-        <select class="form-select form-select-sm" name="urgency">
-          <option value="" {% if not filters.urgency %}selected{% endif %}>Всички</option>
-          <option value="{{ Task.Urgency.LOW }}" {% if filters.urgency == Task.Urgency.LOW|stringformat:'s' %}selected{% endif %}>Ниска</option>
-          <option value="{{ Task.Urgency.NORMAL }}" {% if filters.urgency == Task.Urgency.NORMAL|stringformat:'s' %}selected{% endif %}>Нормална</option>
-          <option value="{{ Task.Urgency.HIGH }}" {% if filters.urgency == Task.Urgency.HIGH|stringformat:'s' %}selected{% endif %}>Висока</option>
-          <option value="{{ Task.Urgency.URGENT }}" {% if filters.urgency == Task.Urgency.URGENT|stringformat:'s' %}selected{% endif %}>Спешна</option>
-        </select>
-      </div>
-      <div class="col-12 col-md-4 col-xl-2">
         <label class="form-label mb-1">Сортиране</label>
         <select class="form-select form-select-sm" name="sort">
-          <option value="priority" {% if filters.sort == 'priority' %}selected{% endif %}>Спешност + срок</option>
+          <option value="due" {% if filters.sort == 'due' %}selected{% endif %}>Срок: най-скоро</option>
           <option value="due" {% if filters.sort == 'due' %}selected{% endif %}>Срок: най-скоро</option>
           <option value="due_desc" {% if filters.sort == 'due_desc' %}selected{% endif %}>Срок: най-късно</option>
-          <option value="urgency" {% if filters.sort == 'urgency' %}selected{% endif %}>Само спешност</option>
         </select>
       </div>
       <div class="col-12 col-md-4 col-xl-2 d-flex align-items-end gap-2">
@@ -90,9 +79,8 @@
           <th>Задача</th>
           <th>Адрес</th>
           <th>Срок</th>
-          <th>Спешност</th>
           <th>Статус</th>
-          {% if is_courier %}<th class="text-end">Действие</th>{% endif %}
+          {% if can_add_to_course %}<th class="text-end">Действие</th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -102,22 +90,12 @@
             <td>
               <a class="fw-semibold text-decoration-none" href="{% url 'tasks:detail' t.id %}">{{ t.title }}</a>
               <div class="small text-muted">{{ t.get_type_display }} · добавена: {{ t.created_at|date:'d.m.Y H:i' }}</div>
+              {% if t.course_note %}<div class="small text-warning-emphasis">Причина за неприключване: {{ t.course_note }}</div>{% endif %}
             </td>
             <td class="small">{{ t.address.name|default_if_none:'' }}{% if t.address and t.address_text %}<div class="text-muted">{{ t.address_text|linebreaksbr }}</div>{% else %}{{ t.address_text|linebreaksbr }}{% endif %}</td>
             <td class="small">
               <span class="{% if t.is_overdue %}text-danger fw-semibold{% endif %}">{{ t.due_at|date:'d.m.Y H:i' }}</span>
               {% if t.is_overdue %}<div class="small text-danger">просрочена</div>{% endif %}
-            </td>
-            <td>
-              {% if t.urgency == Task.Urgency.URGENT %}
-                <span class="badge badge-soft text-bg-danger">Спешна</span>
-              {% elif t.urgency == Task.Urgency.HIGH %}
-                <span class="badge badge-soft text-bg-warning">Висока</span>
-              {% elif t.urgency == Task.Urgency.NORMAL %}
-                <span class="badge badge-soft text-bg-info">Нормална</span>
-              {% else %}
-                <span class="badge badge-soft text-bg-secondary">Ниска</span>
-              {% endif %}
             </td>
             <td>
               {% if t.status == Task.Status.DONE %}
@@ -126,26 +104,70 @@
                 <span class="badge badge-soft text-bg-primary">Активна</span>
               {% endif %}
             </td>
-              {% if is_courier %}
+              {% if can_add_to_course %}
                 <td class="text-end task-actions">
-                  {% if t.id in in_course_ids %}
+                  {% if is_merchant_member %}
+                    {% if t.status == Task.Status.OPEN and t.course_active %}
+                      <form method="post" action="{% url 'tasks:course_remove' t.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+                        <button class="btn btn-danger btn-sm w-100" type="submit">Премахни от курса</button>
+                      </form>
+                    {% elif t.status == Task.Status.OPEN %}
+                      <div class="d-flex flex-column gap-1">
+                        <form method="post" action="{% url 'tasks:course_add' t.id %}">
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+                          <button class="btn btn-outline-primary btn-sm w-100" type="submit">Добави в курса</button>
+                        </form>
+                        {% if t.course_note %}
+                          <form method="post" action="{% url 'tasks:delete' t.id %}" onsubmit="return confirm('Да премахна ли тази задача окончателно?');">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm w-100" type="submit">Премахни</button>
+                          </form>
+                        {% endif %}
+                      </div>
+                    {% endif %}
+                  {% elif is_admin %}
+                    {% if t.course_active and t.status == Task.Status.OPEN %}
+                      <form method="post" action="{% url 'tasks:course_remove' t.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+                        <button class="btn btn-danger btn-sm w-100" type="submit">Премахни от курса</button>
+                      </form>
+                    {% elif t.status == Task.Status.OPEN %}
+                      <div class="d-flex flex-column gap-1">
+                        <form method="post" action="{% url 'tasks:course_add' t.id %}">
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+                          <button class="btn btn-outline-primary btn-sm w-100" type="submit">Добави в курса</button>
+                        </form>
+                        {% if t.course_note %}
+                          <form method="post" action="{% url 'tasks:delete' t.id %}" onsubmit="return confirm('Да премахна ли тази задача окончателно?');">
+                            {% csrf_token %}
+                            <button class="btn btn-danger btn-sm w-100" type="submit">Премахни</button>
+                          </form>
+                        {% endif %}
+                      </div>
+                    {% endif %}
+                  {% elif t.course_active %}
                     <form method="post" action="{% url 'tasks:course_remove' t.id %}">
                       {% csrf_token %}
                       <input type="hidden" name="next" value="{{ request.get_full_path }}" />
-                      <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Махни от курс</button>
+                      <button class="btn btn-outline-secondary btn-sm w-100" type="submit">Премести в задачи</button>
                     </form>
                   {% else %}
                     <form method="post" action="{% url 'tasks:course_add' t.id %}">
                       {% csrf_token %}
                       <input type="hidden" name="next" value="{{ request.get_full_path }}" />
-                      <button class="btn btn-outline-primary btn-sm w-100" type="submit">Добави в курс</button>
+                      <button class="btn btn-outline-primary btn-sm w-100" type="submit">Добави в курса</button>
                     </form>
                   {% endif %}
                 </td>
               {% endif %}
           </tr>
         {% empty %}
-          <tr><td colspan="{% if is_courier %}7{% else %}6{% endif %}" class="text-muted">Няма свободни активни задачи по текущите филтри.</td></tr>
+          <tr><td colspan="{% if can_add_to_course %}6{% else %}5{% endif %}" class="text-muted">Няма задачи по текущите филтри.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -169,4 +191,3 @@
     </nav>
   {% endif %}
 {% endblock %}
-

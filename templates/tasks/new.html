@@ -18,12 +18,25 @@
     {% endif %}
 
     <div class="row g-3">
-      {{ form.due_date }}
-
-      <div class="col-12 col-md-6">
-        <label class="form-label" for="{{ form.task_text.id_for_label }}">Задача</label>
-        {{ form.task_text }}
-        {{ form.task_text.errors }}
+      <div class="col-12 col-md-6 client-field-container">
+        <label class="form-label" for="{{ form.client.id_for_label }}">Клиент</label>
+        {{ form.client }}
+        <div class="list-group position-absolute w-100 shadow d-none client-suggestions" id="client-suggestions" role="listbox">
+          {% for address in form.address_book %}
+            <button
+              class="list-group-item list-group-item-action py-2 client-suggestion"
+              type="button"
+              role="option"
+              data-client-name="{{ address.name }}"
+              data-address-text="{{ address.address_text }}"
+            >
+              <span class="d-block fw-semibold">{{ address.name }}</span>
+              <span class="d-block small text-muted">{{ address.address_text }}</span>
+            </button>
+          {% endfor %}
+          <div class="list-group-item text-muted small d-none" id="no-client-suggestions">Няма намерени клиенти от адресната книга.</div>
+        </div>
+        {{ form.client.errors }}
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label" for="{{ form.contact_address.id_for_label }}">Контакти и адрес</label>
@@ -31,22 +44,17 @@
         {{ form.contact_address.errors }}
       </div>
 
-      <div class="col-12 col-md-3">
+      <div class="col-12 col-md-4">
         <label class="form-label" for="{{ form.type.id_for_label }}">Вид</label>
         {{ form.type }}
         {{ form.type.errors }}
       </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label" for="{{ form.urgency.id_for_label }}">Спешност</label>
-        {{ form.urgency }}
-        {{ form.urgency.errors }}
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Дата</label>
-        <div class="form-control bg-light">Днес ({% now "d.m.Y" %})</div>
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="{{ form.due_date.id_for_label }}">Дата на курса</label>
+        {{ form.due_date }}
         {{ form.due_date.errors }}
       </div>
-      <div class="col-12 col-md-3">
+      <div class="col-12 col-md-4">
         <label class="form-label d-block">Срок</label>
         <div class="d-flex gap-3">
           {% for radio in form.due_slot %}
@@ -73,3 +81,100 @@
   </form>
 {% endblock %}
 
+{% block extra_js %}
+  <style>
+    .client-field-container {
+      position: relative;
+    }
+
+    .client-suggestions {
+      z-index: 1050;
+      top: calc(100% - .5rem);
+      max-height: 16rem;
+      overflow-y: auto;
+    }
+  </style>
+  <script>
+    const clientField = document.getElementById("id_client");
+    const contactAddressField = document.getElementById("id_contact_address");
+    const suggestions = document.getElementById("client-suggestions");
+    const suggestionItems = [...suggestions.querySelectorAll(".client-suggestion")];
+    const noSuggestions = document.getElementById("no-client-suggestions");
+    let activeSuggestionIndex = -1;
+    let autofilledAddress = "";
+
+    const hideSuggestions = () => {
+      suggestions.classList.add("d-none");
+      activeSuggestionIndex = -1;
+    };
+
+    const showSuggestions = () => {
+      const query = clientField.value.trim().toLocaleLowerCase();
+      let visibleCount = 0;
+      suggestionItems.forEach((item) => {
+        const matches = !query
+          || item.dataset.clientName.toLocaleLowerCase().includes(query)
+          || item.dataset.addressText.toLocaleLowerCase().includes(query);
+        item.classList.toggle("d-none", !matches);
+        if (matches) visibleCount += 1;
+      });
+      noSuggestions.classList.toggle("d-none", visibleCount > 0);
+      suggestions.classList.remove("d-none");
+      activeSuggestionIndex = -1;
+    };
+
+    const chooseSuggestion = (item) => {
+      clientField.value = item.dataset.clientName;
+      contactAddressField.value = item.dataset.addressText;
+      autofilledAddress = item.dataset.addressText;
+      hideSuggestions();
+    };
+
+    clientField.addEventListener("focus", showSuggestions);
+    clientField.addEventListener("input", () => {
+      if (autofilledAddress && contactAddressField.value === autofilledAddress) {
+        contactAddressField.value = "";
+      }
+      autofilledAddress = "";
+      showSuggestions();
+    });
+
+    suggestionItems.forEach((item) => {
+      item.addEventListener("mousedown", (event) => event.preventDefault());
+      item.addEventListener("click", () => chooseSuggestion(item));
+    });
+
+    clientField.addEventListener("keydown", (event) => {
+      const visibleItems = suggestionItems.filter((item) => !item.classList.contains("d-none"));
+      if (event.key === "Escape") {
+        hideSuggestions();
+      } else if (event.key === "ArrowDown" && visibleItems.length) {
+        event.preventDefault();
+        activeSuggestionIndex = (activeSuggestionIndex + 1) % visibleItems.length;
+        visibleItems[activeSuggestionIndex].focus();
+      }
+    });
+
+    suggestionItems.forEach((item) => {
+      item.addEventListener("keydown", (event) => {
+        const visibleItems = suggestionItems.filter((option) => !option.classList.contains("d-none"));
+        const currentIndex = visibleItems.indexOf(item);
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const direction = event.key === "ArrowDown" ? 1 : -1;
+          const nextIndex = (currentIndex + direction + visibleItems.length) % visibleItems.length;
+          visibleItems[nextIndex].focus();
+        } else if (event.key === "Escape") {
+          clientField.focus();
+          hideSuggestions();
+        } else if (event.key === "Tab") {
+          hideSuggestions();
+        }
+      });
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!clientField.parentElement.contains(event.target)) hideSuggestions();
+    });
+  </script>
+{% endblock %}

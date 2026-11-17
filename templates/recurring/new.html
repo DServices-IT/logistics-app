@@ -49,11 +49,6 @@
         {{ form.type }}
         {{ form.type.errors }}
       </div>
-      <div class="col-12 col-md-2">
-        <label class="form-label" for="{{ form.urgency.id_for_label }}">Спешност</label>
-        {{ form.urgency }}
-        {{ form.urgency.errors }}
-      </div>
       <div class="col-12">
         <label class="form-label" for="{{ form.note.id_for_label }}">Забележка</label>
         {{ form.note }}
@@ -73,4 +68,3 @@
     </div>
   </form>
 {% endblock %}
-
