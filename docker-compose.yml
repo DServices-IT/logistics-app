@@ -1,0 +1,68 @@
+
+services:
+  logistics:
+    build:
+      context: "https://${GIT_TOKEN}@github.com/Nedanovw/logistics.git#main"
+    image: logistics:latest
+    pull_policy: build
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: logistics-db
+      POSTGRES_PORT: "5432"
+
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DEBUG: "False"
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+
+
+    volumes:
+      - logistics_static:/app/staticfiles
+      - logistics_media:/app/media
+
+    depends_on:
+      logistics-db:
+        condition: service_healthy
+
+    networks:
+      - logistics_internal
+      - nginx-proxy
+
+  logistics-db:
+    image: postgres:16
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - logistics_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+    networks:
+      - logistics_internal
+
+volumes:
+  logistics_static:
+  logistics_media:
+  logistics_postgres_data:
+
+networks:
+  logistics_internal:
+    driver: bridge
+
+  nginx-proxy:
+    external: true
