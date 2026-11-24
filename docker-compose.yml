@@ -2,7 +2,7 @@
 services:
   logistics:
     build:
-      context: "https://${GIT_TOKEN}@github.com/Nedanovw/logistics.git#main"
+      context: "https://${GIT_TOKEN}@github.com/DServices-IT/logistics-app.git#main"
     image: logistics:latest
     pull_policy: build
     restart: unless-stopped
