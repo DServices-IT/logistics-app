@@ -56,6 +56,9 @@ class Task(models.Model):
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.OPEN)
 
     done_at = models.DateTimeField(null=True, blank=True)
+    course_active = models.BooleanField(default=False)
+    course_overdue = models.BooleanField(default=False)
+    course_note = models.TextField(blank=True)
     done_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -84,6 +87,13 @@ class Task(models.Model):
     @property
     def is_overdue(self) -> bool:
         return self.status != Task.Status.DONE and self.due_at < timezone.now()
+
+    @property
+    def is_course_overdue(self) -> bool:
+        return (
+            self.status == Task.Status.OPEN
+            and (self.course_overdue or self.is_overdue)
+        )
 
     @property
     def priority_score(self) -> int:

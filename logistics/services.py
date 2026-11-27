@@ -39,7 +39,11 @@ def generate_recurring_tasks_for_day(day=None) -> int:
         for template in templates:
             if not template.applies_on(day):
                 continue
-            if Task.objects.filter(recurring_template=template, status=Task.Status.OPEN).exists():
+            if Task.objects.filter(
+                recurring_template=template,
+                status=Task.Status.OPEN,
+                course_active=True,
+            ).exists():
                 continue
             if Task.objects.filter(recurring_template=template, due_at__date=day).exists():
                 continue
@@ -54,6 +58,7 @@ def generate_recurring_tasks_for_day(day=None) -> int:
                 due_at=make_due_at_time(day, template.due_time),
                 urgency=template.urgency,
                 recurring_template=template,
+                course_active=True,
             )
             created += 1
     return created
@@ -64,13 +69,17 @@ def roll_over_open_tasks_to_today() -> int:
     today = timezone.localdate()
     moved = 0
     with transaction.atomic():
-        tasks = Task.objects.select_for_update().filter(status=Task.Status.OPEN, due_at__date__lt=today)
+        tasks = Task.objects.select_for_update().filter(
+            status=Task.Status.OPEN,
+            course_active=True,
+            due_at__date__lt=today,
+        )
         for task in tasks:
             local_due = timezone.localtime(task.due_at)
             task.due_at = timezone.make_aware(
                 datetime.combine(today, local_due.time())
             )
-            task.save(update_fields=["due_at"])
+            task.course_overdue = True
+            task.save(update_fields=["due_at", "course_overdue"])
             moved += 1
     return moved
-
